@@ -1,0 +1,50 @@
+{
+  "name": "postloom",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "^22.13.0 || ^24.0.0"
+  },
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "prisma generate && next build --webpack",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "db:push": "tsx scripts/db-push.ts",
+    "postinstall": "prisma generate",
+    "check:env": "tsx scripts/check-env.ts",
+    "db:ttl": "tsx scripts/db-ttl.ts",
+    "format": "prettier --write \"app/**/*.{ts,tsx,css}\" \"components/**/*.{ts,tsx}\" \"actions/**/*.ts\" \"lib/**/*.ts\" \"scripts/**/*.ts\" \"tests/**/*.ts\" \"*.mjs\" \"*.json\""
+  },
+  "dependencies": {
+    "@next/env": "16.3.8",
+    "@phosphor-icons/react": "2.1.10",
+    "@prisma/client": "6.19.3",
+    "bcryptjs": "^3.0.2",
+    "geist": "1.7.2",
+    "next": "16.3.8",
+    "next-auth": "5.0.0-beta.32",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "server-only": "^0.0.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.8",
+    "prettier": "^3.9.9",
+    "prisma": "6.19.3",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.2"
+  }
+}

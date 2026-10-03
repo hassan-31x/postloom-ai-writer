@@ -1,0 +1,56 @@
+generator client {
+ provider = "prisma-client-js"
+ binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+datasource db {
+ provider = "mongodb"
+ url = env("DATABASE_URL")
+}
+model User {
+ id String @id @default(auto()) @map("_id") @db.ObjectId
+ email String @unique
+ name String
+ password String
+ emailVerified DateTime?
+ sessionVersion Int @default(0)
+ voice String @default("")
+ createdAt DateTime @default(now())
+ drafts Draft[]
+ sources Source[]
+}
+model Draft {
+ id String @id @default(auto()) @map("_id") @db.ObjectId
+ userId String @db.ObjectId
+ user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ title String
+ content String
+ platform String
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ @@index([userId, updatedAt])
+}
+model Source {
+ id String @id @default(auto()) @map("_id") @db.ObjectId
+ userId String @db.ObjectId
+ user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ name String
+ url String
+ notes String @default("")
+ createdAt DateTime @default(now())
+ @@index([userId])
+}
+model Token {
+ id String @id @default(auto()) @map("_id") @db.ObjectId
+ hash String @unique
+ email String
+ purpose String
+ expires DateTime
+ @@index([expires])
+}
+model Usage {
+ id String @id @default(auto()) @map("_id") @db.ObjectId
+ key String @unique
+ count Int @default(0)
+ expires DateTime
+ @@index([expires])
+}
