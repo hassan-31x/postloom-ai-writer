@@ -80,7 +80,7 @@ export function AuthForm({ mode, token }: { mode: string; token?: string }) {
               required
               maxLength={254}
               autoComplete="email"
-              placeholder="you@company.com"
+              placeholder="try: hassan@useryze.com"
               disabled={pending}
             />
           </label>
@@ -99,7 +99,7 @@ export function AuthForm({ mode, token }: { mode: string; token?: string }) {
                 minLength={mode === "login" ? 1 : 10}
                 maxLength={72}
                 autoComplete={mode === "login" ? "current-password" : "new-password"}
-                placeholder={mode === "login" ? "Your password" : "At least 10 characters"}
+                placeholder={mode === "login" ? "try: hassan@useryze.com" : "At least 10 characters"}
                 disabled={pending}
               />
               <button
