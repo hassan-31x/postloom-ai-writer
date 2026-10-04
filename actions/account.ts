@@ -35,9 +35,15 @@ export async function accountAction(
       await authLimit("signup", data.email, 5);
       if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM)
         return { error: "Email signup is not configured yet. Please contact support." };
-      const existing = await db.user.findUnique({ where: { email: data.email } });
+      const existing = await db.user.findUnique({
+        where: { email: data.email },
+        select: { emailVerified: true },
+      });
       if (!existing)
-        await db.user.create({ data: { ...data, password: await bcrypt.hash(data.password, 12) } });
+        await db.user.create({
+          data: { ...data, password: await bcrypt.hash(data.password, 12) },
+          select: { id: true },
+        });
       if (!existing?.emailVerified) await sendAccountEmail(data.email, "verify");
       return {
         success:
@@ -47,7 +53,7 @@ export async function accountAction(
     if (mode === "reset-password" || mode === "resend") {
       const email = emailSchema.parse(values.email);
       await authLimit(mode, email, 5);
-      const user = await db.user.findUnique({ where: { email } });
+      const user = await db.user.findUnique({ where: { email }, select: { emailVerified: true } });
       if (user && (mode !== "resend" || !user.emailVerified))
         await sendAccountEmail(email, mode === "resend" ? "verify" : "reset");
       return {
@@ -76,7 +82,7 @@ export async function accountAction(
           : { emailVerified: new Date() };
       await db.$transaction(async (tx) => {
         await tx.token.delete({ where: { id: record.id } });
-        await tx.user.update({ where: { email: record.email }, data });
+        await tx.user.update({ where: { email: record.email }, data, select: { id: true } });
         await tx.token.deleteMany({ where: { email: record.email, purpose } });
       });
       return {

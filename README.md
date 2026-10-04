@@ -27,6 +27,7 @@ cp .env.example .env.local
 npm run check:env
 npm run db:push
 npm run db:ttl
+npm run check:auth
 npm run dev
 ```
 
@@ -66,6 +67,10 @@ npm audit --omit=dev
 ```
 
 `npm run check:env` verifies required values without printing secrets. It does not contact providers. Build and public pages work without live service credentials. Account and AI flows need configured services. See `VERIFICATION.md` for the actual checks performed and remaining service-dependent checks.
+
+`npm run check:auth` performs read-only checks of MongoDB connectivity, replica-set support, required unique/expiration indexes, and the Resend sending domain. It sends no emails and prints no account data or credentials. A `resend.dev` sender only delivers to the email associated with your Resend account; public signup needs a verified domain. Set `APP_URL` to the live site origin so confirmation/reset links open the deployed app. After a failed signup email, the pending account is retained; request another confirmation link once email delivery is configured.
+
+If an existing MongoDB account has explicit null default fields, run `npm run db:repair-users`. It backfills null/missing `createdAt` from the account ObjectId timestamp and restores null/missing `sessionVersion` and `voice` defaults. It preserves existing non-null values, passwords, and email verification. Prisma schema defaults do not repair explicit nulls in existing documents. The auth diagnostic reads full account records to detect conversion failures such as `P2032`.
 
 ## Before launch
 

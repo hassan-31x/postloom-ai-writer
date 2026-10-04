@@ -1,6 +1,7 @@
 import nextEnv from "@next/env";
 nextEnv.loadEnvConfig(process.cwd());
 const errors: string[] = [];
+const warnings: string[] = [];
 for (const key of [
   "DATABASE_URL",
   "AUTH_SECRET",
@@ -22,10 +23,21 @@ if (process.env.APP_URL) {
       errors.push("APP_URL must be an HTTP(S) origin without a path or credentials.");
     if (process.env.NODE_ENV === "production" && u.protocol !== "https:")
       errors.push("Production APP_URL must use HTTPS.");
+    if (["localhost", "127.0.0.1", "[::1]"].includes(u.hostname))
+      warnings.push(
+        "APP_URL points to localhost. Set it to the live site origin before deployment.",
+      );
   } catch {
     errors.push("APP_URL must be a valid URL.");
   }
 }
+if (/@resend\.dev(?:>|\s|$)/i.test(process.env.EMAIL_FROM || "")) {
+  const warning =
+    "EMAIL_FROM uses Resend's testing sender. Only the Resend account owner's email can receive links; use a verified sending domain for public signup.";
+  if (process.env.NODE_ENV === "production") errors.push(warning);
+  else warnings.push(warning);
+}
+if (warnings.length) console.warn(warnings.map((warning) => `Warning: ${warning}`).join("\n"));
 for (const key of [
   "AI_DAILY_LIMIT",
   "AI_GLOBAL_DAILY_LIMIT",

@@ -16,7 +16,9 @@
     "db:push": "tsx scripts/db-push.ts",
     "postinstall": "prisma generate",
     "check:env": "tsx scripts/check-env.ts",
+    "check:auth": "tsx scripts/check-auth.ts",
     "db:ttl": "tsx scripts/db-ttl.ts",
+    "db:repair-users": "tsx scripts/repair-users.ts",
     "format": "prettier --write \"app/**/*.{ts,tsx,css}\" \"components/**/*.{ts,tsx}\" \"actions/**/*.ts\" \"lib/**/*.ts\" \"scripts/**/*.ts\" \"tests/**/*.ts\" \"*.mjs\" \"*.json\""
   },
   "dependencies": {
