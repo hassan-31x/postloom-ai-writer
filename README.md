@@ -1,62 +1,225 @@
 # Postloom
 
-A standalone content workspace for solo creators and small marketing teams, prepared for Vercel. The original `content-web` Amplify project is not changed.
+Postloom is a full-stack social content workspace built with **Next.js App Router, React, TypeScript, and MongoDB**. It uses Prisma for persistence, Auth.js for email/password authentication, Resend for account emails, and OpenRouter for AI writing and optional image generation.
 
-## What works
+The application combines server-rendered pages with interactive client components. Mutations run through Next.js Server Actions, while account sessions use encrypted JWT session cookies and database-backed session revocation. The project is configured for deployment on Vercel.
 
-- Premium responsive landing page, custom brand and icons, social card, sitemap, privacy and terms pages.
-- Email/password registration, email verification, login, reset, resend confirmation, and logout.
-- Writer with LinkedIn, X, Instagram, and Facebook text previews, word/character counts, copy, export, and tab-local recovery of unsaved text.
-- OpenRouter drafting, rewriting, shortening, hooks, hashtags, editorial feedback, and image prompts. Suggestions require explicit acceptance.
-- Private draft library with search, edits, and deletion; up to 500 drafts per account.
-- Brand voice and reference notes; up to 30 sources. The five latest sources provide context. Links are stored, not crawled.
-- Optional OpenRouter image generation and download, with separate limits. Images are temporary and not saved to the database.
-- Persistent request limits, an app-wide daily cap, input validation, hashed passwords/tokens, and account ownership checks.
+| Layer          | Technology                              | Role                                                      |
+| -------------- | --------------------------------------- | --------------------------------------------------------- |
+| Application    | Next.js 16.3.8, React 19.3.0            | App Router, Server Components, Server Actions             |
+| Language       | TypeScript 5.9                          | Typed components, actions, and service integrations       |
+| Database       | MongoDB, Prisma 6.19.3                  | Accounts, drafts, reference notes, tokens, usage counters |
+| Authentication | Auth.js / NextAuth 5 beta, bcryptjs     | Credentials login, JWT sessions, password hashing         |
+| Validation     | Zod 4                                   | Server-side input validation and normalization            |
+| Email          | Resend HTTP API                         | Verification and password reset links                     |
+| AI             | OpenRouter HTTP API                     | Drafting, editing, feedback, optional image generation    |
+| Interface      | CSS, Geist, Phosphor Icons              | Responsive editor, dashboard, and public pages            |
+| Tooling        | ESLint, Prettier, tsx, Node test runner | Static checks, formatting, scripts, unit tests            |
 
-Direct social publishing, automatic scheduling, social analytics, scraping and Pinecone similarity search are not part of this version. The original publishing button was not implemented; insecure social OAuth callbacks and dependencies were removed. Social channel previews are illustrative, not exact platform renderers. This copy uses a **new schema and a separate database**, with no migration of office users or content.
+## Run locally
 
-## Local setup
+### 1. Prerequisites
 
-Use Node **22.13+ on the 22.x line**, or Node 24.x.
+- **Node.js 22.13+ on the 22.x line, or Node.js 24.x**, with npm.
+- A dedicated MongoDB database with replica-set support, such as MongoDB Atlas.
+- A Resend API key and sender address.
+- An OpenRouter API key for AI features.
+
+MongoDB transactions are required for email verification and password reset. A standalone MongoDB instance without a replica set cannot complete those operations.
+
+### 2. Install and configure
+
+From the repository root:
 
 ```sh
 npm ci
 cp .env.example .env.local
-# Fill the values in .env.local, using a separate MongoDB Atlas database.
-# Generate AUTH_SECRET using: openssl rand -base64 48
+openssl rand -base64 48
+```
+
+Fill in `.env.local` using the variables below. Use the generated value for `AUTH_SECRET`. If you already have a configured `.env`, you can keep it; avoid conflicting values in `.env.local`, which takes precedence.
+
+```sh
 npm run check:env
+```
+
+This command validates configuration without contacting external services or printing secrets.
+
+### 3. Initialize the database
+
+```sh
 npm run db:push
 npm run db:ttl
 npm run check:auth
+```
+
+| Command      | What it does                                                                           |
+| ------------ | -------------------------------------------------------------------------------------- |
+| `db:push`    | Synchronizes MongoDB collections and indexes with the Prisma schema                    |
+| `db:ttl`     | Enables automatic expiration for tokens and request counters                           |
+| `check:auth` | Checks full account reads, replica-set support, auth indexes, and sender configuration |
+
+`check:auth` is read-only and sends no emails. With a Resend testing sender, it reports a recipient restriction even when the database checks pass.
+
+### 4. Start the application
+
+```sh
 npm run dev
 ```
 
-MongoDB Atlas provides the replica set needed by verification/reset transactions. Use a dedicated `postloom` database and a dedicated database user. Configure Atlas connectivity for your Vercel deployment. Prisma 6.19.3 is retained for MongoDB compatibility; do not upgrade Prisma independently without checking MongoDB support.
+Open **http://localhost:3000**. To run the production build locally:
 
-Verify your sending domain with Resend and set `EMAIL_FROM` to an address on that domain. Resend's sandbox sender cannot support unrestricted public signups. Signup creates a pending account and sends a verification link; login is blocked until confirmation. If delivery fails, use **Resend confirmation email**. Links expire in one hour and are stored only as hashes. Passwords must be 10–72 characters and at most 72 UTF-8 bytes. Password changes and resets revoke existing sessions.
+```sh
+npm run build
+npm start
+```
 
-## Vercel deployment
+> **Email testing:** A `resend.dev` sender can only send links to the email associated with your Resend account. Use that recipient for local testing, or configure a verified sending domain. Set `APP_URL=http://localhost:3000` locally so account links return to this app.
 
-1. Push **this folder** to a new private Git repository. Never copy the office project's `.env` or Git history.
-2. Import the repository in Vercel. Select Next.js and Node 22.x (or 24.x). `vercel.json` supplies `npm ci` and `npm run build`.
-3. Set the variables from `.env.example` in Vercel. `DATABASE_URL`, `AUTH_SECRET`, `APP_URL`, `RESEND_API_KEY`, `EMAIL_FROM`, `OPENROUTER_API_KEY` and `SUPPORT_EMAIL` are required for launch. Set `APP_URL` to the final **HTTPS origin**, without a path. No secret uses a `NEXT_PUBLIC_` prefix.
-4. With the same database configured locally, run `npm run db:push` and `npm run db:ttl` **once before launch**. These create collections, unique keys, and expiration indexes. The build only generates Prisma Client; it never changes the database.
-5. Deploy, then register a real account, confirm its email, log in, generate a post, save/edit/remove a draft, reset your password, and check the new password. `/api/health` checks that the app is serving, not database or provider connectivity.
-6. Use a separate database and separate provider keys for preview deployments. Set preview `APP_URL` to that preview's domain so email links do not point to production.
+## Environment variables
 
-Dashboard routes declare a 120-second maximum duration, with text-provider timeout at 45 seconds and image timeout at 90 seconds. Verify the duration allowed by your Vercel plan. Runtime variables are server-only; the public origin is included in metadata, not credentials. Auth.js detects its callback origin and trusts Vercel’s host headers. The app only protects dashboard routes through server-side session checks; all data and AI actions independently validate the account.
+Copy the complete template from [`.env.example`](.env.example). Variables are read on the server; credentials do not use a `NEXT_PUBLIC_` prefix.
 
-## Keep the free plan inexpensive
+### Core services
 
-The default is `google/gemini-2.5-flash-lite` through OpenRouter. At the time of implementation its listed rates were $0.10 per million input tokens and $0.40 per million output tokens: https://openrouter.ai/google/gemini-2.5-flash-lite. With approximately 2,000 input tokens and a 1,000-token output ceiling, a text request is around $0.0006. This is an estimate, not a billing guarantee. Actual input varies with reference notes. Verify current pricing in your OpenRouter account.
+| Variable             | Purpose                                        | Example or requirement                                      |
+| -------------------- | ---------------------------------------------- | ----------------------------------------------------------- |
+| `DATABASE_URL`       | MongoDB connection string                      | Dedicated database with replica-set support                 |
+| `AUTH_SECRET`        | Protects JWT authentication sessions           | At least 32 characters; generate with OpenSSL               |
+| `APP_URL`            | Origin used in email links and public metadata | `http://localhost:3000` locally; HTTPS origin in production |
+| `RESEND_API_KEY`     | Authorizes account emails                      | Resend API key                                              |
+| `EMAIL_FROM`         | Sender for verification/reset emails           | `Postloom <hello@your-domain.com>`                          |
+| `OPENROUTER_API_KEY` | Authorizes AI requests                         | OpenRouter API key                                          |
+| `SUPPORT_EMAIL`      | Contact shown in privacy and terms pages       | Your support address                                        |
 
-Defaults: 20 text requests per verified account per UTC day; 1,000 text requests across the app. Limits are persisted in MongoDB using unique keys and atomic increments, so they work across Vercel instances. Failed requests count once quota is reserved; rejected attempts may increment the counter beyond the limit, while the UI displays the capped count. Set an OpenRouter key budget too; request caps are not a dollar-denominated spending cap. Provider fallbacks are disabled for text generation to avoid unexpected provider fallback behavior.
+`check:env` requires all of these values for launch readiness. Public pages and the build can run without live service credentials; authentication and AI operations need their respective services.
 
-Images are disabled by default because they are materially more expensive than text. To enable them, set `ENABLE_IMAGE_GENERATION=true` and confirm an available image-output model in `OPENROUTER_IMAGE_MODEL`. The starter setting is `bytedance-seed/seedream-4.5`, using OpenRouter's `/api/v1/images` API (https://openrouter.ai/docs/guides/overview/multimodal/image-generation). Defaults: 2 images per account and 20 globally per UTC day. Check current rates before enabling. The image timeout still counts against the daily quota. Downloads are generated in the browser; no image-storage bucket is required.
+### AI and usage settings
 
-Auth requests have per-email and per-network hourly limits. On Vercel the app uses the Vercel-supplied `x-vercel-forwarded-for` header and stores only its hash. Local development shares a `local` network bucket. Abuse controls are a baseline: enable Vercel firewall/bot rules and OpenRouter budget limits for public launch. Essential session cookies are used; no analytics or advertising trackers are included.
+| Variable                   | Default                                 | Purpose                                                    |
+| -------------------------- | --------------------------------------- | ---------------------------------------------------------- |
+| `OPENROUTER_MODEL`         | `google/gemini-2.5-flash-lite`          | Text-generation model identifier                           |
+| `AI_DAILY_LIMIT`           | `20`                                    | Text requests per account per UTC day                      |
+| `AI_GLOBAL_DAILY_LIMIT`    | `1000`                                  | Text requests across the app per UTC day                   |
+| `ENABLE_IMAGE_GENERATION`  | `false`                                 | Enables the image studio                                   |
+| `OPENROUTER_IMAGE_MODEL`   | Template: `bytedance-seed/seedream-4.5` | Image model; confirm provider availability before enabling |
+| `IMAGE_DAILY_LIMIT`        | `2`                                     | Image requests per account per UTC day                     |
+| `IMAGE_GLOBAL_DAILY_LIMIT` | `20`                                    | Image requests across the app per UTC day                  |
 
-## Checks
+Changing environment values requires restarting the local server or redeploying the application.
+
+## Features
+
+| Area             | Functionality                                                                  |
+| ---------------- | ------------------------------------------------------------------------------ |
+| Writing          | Social post editor, character/word counts, clipboard copy, text export         |
+| Channel previews | LinkedIn, X, Instagram, and Facebook text layouts                              |
+| AI assistance    | Generate, rewrite, shorten, hooks, hashtags, editorial feedback, image prompts |
+| Draft library    | Save, search, edit, and delete up to 500 drafts per account                    |
+| Brand context    | Brand voice settings and up to 30 reference sources with notes                 |
+| Recovery         | Unsaved editor content restored from tab-local `sessionStorage`                |
+| Accounts         | Registration, email confirmation, login, resend, password reset, logout        |
+| Image studio     | Optional image generation and download; generated images are temporary         |
+
+AI suggestions require explicit acceptance before replacing editor content. The five latest reference sources contribute their names and notes to writing requests; stored links are not crawled.
+
+Direct social publishing, scheduling, social analytics, and web scraping are outside the current implementation. Channel previews illustrate text layout rather than reproducing platform rendering exactly.
+
+## Architecture
+
+```text
+Client components
+      │
+      ▼
+Next.js Server Actions
+      ├── Zod validation + account/ownership checks
+      ├── Prisma → MongoDB
+      ├── Resend → account emails
+      └── OpenRouter → AI suggestions and images
+```
+
+Pages and layouts render on the server where possible. Client components handle editing, form state, previews, and downloads. Protected dashboard routes call `currentUser()`, and data/AI actions independently validate the account rather than relying only on route protection.
+
+### Repository layout
+
+```text
+app/                 App Router pages, layouts, metadata, and API routes
+  auth/              Login, signup, verification, and password recovery
+  dashboard/         Editor, drafts, settings, sources, and image studio
+  api/auth/          Auth.js route handlers
+  api/health/        Application liveness endpoint
+components/          Interactive forms, editor, navigation, and UI
+actions/            Account, draft, source, and AI Server Actions
+lib/                 Database, sessions, validation, mail, quotas, providers
+prisma/schema.prisma MongoDB models and indexes
+scripts/             Environment checks, database setup, and legacy repair
+tests/               Validation unit tests
+auth.ts              Auth.js providers and session callbacks
+vercel.json          Vercel install/build configuration
+```
+
+### Data model
+
+| Collection | Stores                                                                     | Key constraints               |
+| ---------- | -------------------------------------------------------------------------- | ----------------------------- |
+| `User`     | Account details, password hash, verification, brand voice, session version | Unique email                  |
+| `Draft`    | Post title, content, platform, owner, timestamps                           | Owner/update-time index       |
+| `Source`   | Reference name, URL, notes, owner                                          | Owner index                   |
+| `Token`    | Hashed verification/reset token, purpose, email, expiration                | Unique hash; expiration index |
+| `Usage`    | Request counter, bucket key, expiration                                    | Unique key; expiration index  |
+
+MongoDB document IDs use ObjectIds. Drafts and sources belong to a user; actions scope reads and mutations to the authenticated owner. The build generates Prisma Client but does not synchronize the database or install expiration indexes.
+
+## Authentication and security
+
+**Account lifecycle:** Register → receive confirmation email → confirm email → sign in → open workspace.
+
+- Email addresses are trimmed and normalized to lowercase before lookup.
+- Passwords use bcrypt with a cost factor of 12 and must contain 10–72 characters, with a maximum of 72 UTF-8 bytes.
+- Verification and reset links use random 32-byte tokens. Only SHA-256 hashes are stored, and links expire after one hour.
+- Token consumption and account updates run in a MongoDB transaction. Consumed links cannot be reused.
+- Login requires email confirmation. A signup email failure retains the pending account so confirmation can be requested again.
+- JWT sessions last up to seven days. Password changes and resets increment `sessionVersion`; subsequent account checks reject older sessions.
+- Auth requests have hourly email and network limits. Vercel network identifiers and email addresses are hashed before use in counter keys; local development shares a network bucket.
+
+Account error logging records operation, error code, and a sanitized provider reason. Account deletion/export requests currently require operator assistance. Essential session cookies are used; the app includes no analytics or advertising trackers.
+
+## AI request behavior
+
+Text requests use OpenRouter's `chat/completions` endpoint. Prompts combine the selected channel and tone, brand voice, draft/idea, and reference notes.
+
+| Setting                 | Implementation                            |
+| ----------------------- | ----------------------------------------- |
+| Output limit            | 1,000 tokens per text request             |
+| Temperature             | `0.65`                                    |
+| Text timeout            | 45 seconds                                |
+| Image timeout           | 90 seconds                                |
+| Text provider fallbacks | Disabled                                  |
+| Daily reset             | Midnight UTC                              |
+| Counter storage         | MongoDB unique keys and atomic increments |
+
+Quota is reserved before calling the provider, so failed provider requests consume allowance. Counters persist across app instances. Rejected requests can increment counters beyond the limit; the UI caps the displayed usage.
+
+Images are disabled by default. When enabled, the server calls the OpenRouter `images` endpoint and returns supported base64 image data to the browser for download. Images are not saved in MongoDB or an object-storage bucket.
+
+Actual charges depend on the selected model and token/image usage. Check provider pricing and configure an OpenRouter key budget in addition to application request limits.
+
+## Commands and verification
+
+| Command                   | Purpose                                                        |
+| ------------------------- | -------------------------------------------------------------- |
+| `npm run dev`             | Start the development server with Webpack                      |
+| `npm run build`           | Generate Prisma Client and build production assets             |
+| `npm start`               | Serve the production build                                     |
+| `npm run lint`            | Run ESLint                                                     |
+| `npm run typecheck`       | Run TypeScript without emitting files                          |
+| `npm test`                | Run the validation unit tests                                  |
+| `npm run format`          | Format configured source paths with Prettier                   |
+| `npm run check:env`       | Validate environment values                                    |
+| `npm run check:auth`      | Check database/auth service configuration without sending mail |
+| `npm run db:repair-users` | Backfill null/missing default fields in legacy accounts        |
+
+For a release check:
 
 ```sh
 npm run lint
@@ -66,14 +229,68 @@ npm run build
 npm audit --omit=dev
 ```
 
-`npm run check:env` verifies required values without printing secrets. It does not contact providers. Build and public pages work without live service credentials. Account and AI flows need configured services. See `VERIFICATION.md` for the actual checks performed and remaining service-dependent checks.
+See [VERIFICATION.md](VERIFICATION.md) for recorded browser checks and service-dependent limitations. `npm test` runs the committed validation tests; the recorded browser checks used an isolated database and mocked email/AI responses. They do not establish real email delivery or provider availability.
 
-`npm run check:auth` performs read-only checks of MongoDB connectivity, replica-set support, required unique/expiration indexes, and the Resend sending domain. It sends no emails and prints no account data or credentials. A `resend.dev` sender only delivers to the email associated with your Resend account; public signup needs a verified domain. Set `APP_URL` to the live site origin so confirmation/reset links open the deployed app. After a failed signup email, the pending account is retained; request another confirmation link once email delivery is configured.
+## Troubleshooting
 
-If an existing MongoDB account has explicit null default fields, run `npm run db:repair-users`. It backfills null/missing `createdAt` from the account ObjectId timestamp and restores null/missing `sessionVersion` and `voice` defaults. It preserves existing non-null values, passwords, and email verification. Prisma schema defaults do not repair explicit nulls in existing documents. The auth diagnostic reads full account records to detect conversion failures such as `P2032`.
+<details>
+<summary><strong>Prisma P2032: createdAt is null</strong></summary>
 
-## Before launch
+Existing MongoDB documents can contain explicit null values even when the Prisma schema declares a non-null field with a default. Schema synchronization does not repair those values.
 
-Rotate the credentials embedded in the office source, including database, authentication, mail, AI, vector store, and OAuth keys. The copy contains none of these values, and the original project remains unchanged. Do not reuse office keys or data.
+```sh
+npm run db:repair-users
+npm run check:auth
+```
 
-Set a real `SUPPORT_EMAIL` and review the included privacy/terms text for your operating entity, jurisdiction, retention and backup practices. Account deletion/export requests currently require operator assistance; self-service deletion/export is not implemented. Authenticate and authorize those requests before handling them. TTL indexes remove expired tokens and rate counters. Add monitoring for mail delivery errors and provider failures.
+The repair recovers null/missing `createdAt` from the ObjectId timestamp and restores null/missing `sessionVersion` and `voice` defaults. Existing non-null values, passwords, and verification state are preserved. Repeating the repair does not change already repaired records.
+
+</details>
+
+<details>
+<summary><strong>Registration, resend, or password reset returns a mail error</strong></summary>
+
+Run `npm run check:auth`. Check the Resend API key, sender verification, and recipient eligibility. A `resend.dev` sender is restricted to the Resend account owner's email. For other recipients, configure an address on a verified domain.
+
+After a failed signup email, use **Resend confirmation email**. Do not assume a pending account can sign in before its email is confirmed.
+
+</details>
+
+<details>
+<summary><strong>Login fails or a session expires</strong></summary>
+
+Confirm the email first, use the correct password, and check for rate-limit errors. Password changes and resets invalidate previous sessions; sign in again with the new password. Run `npm run check:auth` to detect database conversion/index problems separately from incorrect credentials.
+
+</details>
+
+<details>
+<summary><strong>Database transactions or email links fail</strong></summary>
+
+Use a MongoDB replica set and configure database network access for the machine or deployment connecting to it. Run `npm run db:push` and `npm run db:ttl` before testing account flows.
+
+Set `APP_URL` to the origin where the app is running. A deployed app using a localhost origin will send confirmation/reset links that open localhost. Expired, malformed, or consumed links require a new email request.
+
+</details>
+
+## Deploy to Vercel
+
+1. Import the repository and select Next.js with Node 22.x or 24.x. `vercel.json` configures `npm ci` and `npm run build`.
+2. Add the environment variables from `.env.example`. Set `APP_URL` to the final HTTPS origin and use a verified email sender for public signup.
+3. With the deployment database configured locally, run `npm run db:push`, `npm run db:ttl`, and `npm run check:auth`.
+4. Deploy, then test registration, confirmation, login, AI generation, draft operations, password reset, and login with the new password against real services.
+5. Use separate database/provider credentials for previews, and set preview `APP_URL` to the corresponding preview origin.
+
+Dashboard routes declare a maximum duration of 120 seconds. Confirm your deployment supports the configured provider timeouts. `/api/health` checks application liveness only; it does not check MongoDB, Resend, or OpenRouter.
+
+Before public launch, review the privacy/terms pages, set `SUPPORT_EMAIL`, configure provider budgets, and monitor delivery/provider failures. Keep credentials out of Git and use dedicated project databases and service keys.
+
+## GitHub repository description
+
+> AI-powered social content workspace built with Next.js, TypeScript, and MongoDB, featuring draft management, brand voice, email authentication, and OpenRouter writing tools.
+
+**Suggested topics:**
+
+```text
+nextjs react typescript mongodb prisma authjs openrouter resend
+ai-writing social-media content-creation draft-management saas vercel
+```
