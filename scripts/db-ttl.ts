@@ -1,6 +1,6 @@
-import { loadEnvConfig } from "@next/env";
+import nextEnv from "@next/env";
 import { PrismaClient } from "@prisma/client";
-loadEnvConfig(process.cwd());
+nextEnv.loadEnvConfig(process.cwd());
 const db = new PrismaClient();
 try {
   for (const collection of ["Usage", "Token"])

@@ -9,6 +9,7 @@ import { authLimit, LimitError } from "@/lib/rate-limit";
 import { sendAccountEmail, tokenHash } from "@/lib/mail";
 import { currentUser } from "@/lib/session";
 import { revalidatePath } from "next/cache";
+import { AccountEmailError, reportAccountError } from "@/lib/account-errors";
 const message = (e: unknown) =>
   e instanceof LimitError ? e.message : "We could not complete that request. Please try again.";
 export async function accountAction(
@@ -55,10 +56,13 @@ export async function accountAction(
       };
     }
     if (mode === "new-password" || mode === "verify-email") {
-      const token = z
+      const tokenResult = z
         .string()
         .regex(/^[a-f0-9]{64}$/)
-        .parse(values.token);
+        .safeParse(values.token);
+      if (!tokenResult.success)
+        return { error: "This link is invalid or expired. Request a new one." };
+      const token = tokenResult.data;
       const record = await db.token.findUnique({ where: { hash: tokenHash(token) } });
       const purpose = mode === "new-password" ? "reset" : "verify";
       if (!record || record.purpose !== purpose || record.expires < new Date())
@@ -85,8 +89,16 @@ export async function accountAction(
     return { error: "Invalid request." };
   } catch (e) {
     if (e instanceof z.ZodError) return { error: e.issues[0]?.message || "Check your details." };
-    if (e instanceof AuthError)
-      return { error: "Email or password is incorrect, or your email has not been confirmed." };
+    if (e instanceof AuthError) {
+      if (e.type === "CredentialsSignin")
+        return { error: "Email or password is incorrect, or your email has not been confirmed." };
+      const cause = e.cause?.err;
+      if (cause instanceof LimitError) return { error: cause.message };
+      reportAccountError(mode, cause || e);
+      return { error: "Sign in is temporarily unavailable. Please try again shortly." };
+    }
+    if (!(e instanceof LimitError)) reportAccountError(mode, e);
+    if (e instanceof AccountEmailError) return { error: e.message };
     return { error: message(e) };
   }
 }

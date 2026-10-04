@@ -1,6 +1,6 @@
-import { loadEnvConfig } from "@next/env";
+import nextEnv from "@next/env";
 import { spawnSync } from "node:child_process";
-loadEnvConfig(process.cwd());
+nextEnv.loadEnvConfig(process.cwd());
 const result = spawnSync(process.execPath, ["node_modules/prisma/build/index.js", "db", "push"], {
   stdio: "inherit",
   env: process.env,

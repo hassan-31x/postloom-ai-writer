@@ -1,5 +1,5 @@
-import { loadEnvConfig } from "@next/env";
-loadEnvConfig(process.cwd());
+import nextEnv from "@next/env";
+nextEnv.loadEnvConfig(process.cwd());
 const errors: string[] = [];
 for (const key of [
   "DATABASE_URL",
